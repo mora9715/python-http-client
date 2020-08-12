@@ -1,4 +1,5 @@
 """HTTP Client library"""
+import ssl
 import json
 import logging
 from .exceptions import handle_error
@@ -74,7 +75,8 @@ class Client(object):
                  version=None,
                  url_path=None,
                  append_slash=False,
-                 timeout=None):
+                 timeout=None,
+                 verify=True):
         """
         :param host: Base URL for the api. (e.g. https://api.sendgrid.com)
         :type host:  string
@@ -92,6 +94,7 @@ class Client(object):
         self.host = host
         self.request_headers = request_headers or {}
         self._version = version
+        self._verify = verify
         # _url_path keeps track of the dynamically built url
         self._url_path = url_path or []
         # APPEND SLASH set
@@ -157,7 +160,8 @@ class Client(object):
                       request_headers=self.request_headers,
                       url_path=url_path,
                       append_slash=self.append_slash,
-                      timeout=self.timeout)
+                      timeout=self.timeout,
+                      verify=self._verify)
 
     def _make_request(self, opener, request, timeout=None):
         """Make the API call and return the response. This is separated into
@@ -256,7 +260,14 @@ class Client(object):
                             'Content-Type', 'application/json')
                         data = json.dumps(request_body).encode('utf-8')
 
-                opener = urllib.build_opener()
+                # Checking if we should create context for unverified SSL request
+                if self._verify:
+                    ssl_context = ssl.create_default_context()
+                else:
+                    ssl_context = ssl._create_unverified_context()
+
+                opener = urllib.build_opener(urllib.HTTPSHandler(context=context))
+                
                 request = urllib.Request(
                     self._build_url(query_params),
                     headers=self.request_headers,
